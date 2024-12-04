@@ -1,12 +1,10 @@
 import pandas as pd
 import pandas_ta as ta
 import os
-
 from datetime import datetime
 from configparser import ConfigParser
 from apscheduler.schedulers.blocking import BlockingScheduler
 from backtesting import Strategy, Backtest
-
 from oanda_candles import Pair, Gran, CandleClient
 from oandapyV20 import API
 import oandapyV20.endpoints.orders as orders
@@ -17,15 +15,17 @@ from oandapyV20.contrib.requests import TakeProfitDetails, StopLossDetails
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
-
-#Only 28 forex pair combinations for the 8 major currencies are supported
-#Following example with EUR_USD pair
-
+#Forex trading bot for OANDA broker
 #Requires Oanda Access token and account ID to initialize client
+#Strategy uses backtesting for weekly optimization of sl/tp values
+#Indicators should be removed/added and parameters tuned to generate more signals based on your strategy
+#Only 28 forex pair combinations for the 8 major currencies are supported
+#Following example with EUR_USD pair in 5min timeframe
+#Script can be run on a VM in cloud with Paper account for analyzing results before deploying Live if profitable
+
 config = ConfigParser(interpolation=None)
 if os.path.exists('tokens_api.ini'):
     config.read('tokens_api.ini')
-    # print(config.sections())
 else:
     print("token file not found!")
 
@@ -33,15 +33,11 @@ accountID = config['oanda_demo']['accountID']
 access_token = config['oanda_demo']['access_token']
 lotsize = 3000
 
-
 def ema_signal(df, current_candle, backcandles):
     df_slice = df.reset_index().copy()
-    # Get the range of candles to consider
     start = max(0, current_candle - backcandles)
     end = current_candle
     relevant_rows = df_slice.iloc[start:end]
-
-    # Check if all EMA_fast values are below EMA_slow values
     if all(relevant_rows["EMA_fast"] < relevant_rows["EMA_slow"]):
         return 1
     elif all(relevant_rows["EMA_fast"] > relevant_rows["EMA_slow"]):
@@ -49,21 +45,16 @@ def ema_signal(df, current_candle, backcandles):
     else:
         return 0
 
-
 def total_signal(df, current_candle, backcandles):
     ema_signal_result = ema_signal(df, current_candle, backcandles)
     candle_open_price = df.Open[current_candle]
     bbl = df['BBL_15_1.5'][current_candle]
     bbu = df['BBU_15_1.5'][current_candle]
-
-    # and df.RSI[current_candle]<60
-    if (ema_signal_result == 2 and candle_open_price <= bbl):
+    if (ema_signal_result == 2 and candle_open_price <= bbl) and df.RSI[current_candle]<60:
         return 2
-    # and df.RSI[current_candle]>40
-    if (ema_signal_result == 1 and candle_open_price >= bbu):
+    if (ema_signal_result == 1 and candle_open_price >= bbu) and df.RSI[current_candle]>40:
         return 1
     return 0
-
 
 def get_candles(n):
     client = CandleClient(access_token, real=False)
@@ -71,13 +62,11 @@ def get_candles(n):
     candles = collector.grab(n)
     return candles
 	
-
 def count_opened_trades():
     client = API(access_token=access_token)
     r = trades.OpenTrades(accountID=accountID)
     client.request(r)
     return len(r.response['trades'])
-
 
 def get_candles_frame(n):
     candles = get_candles(n)
@@ -96,8 +85,7 @@ def get_candles_frame(n):
     dfstream['High'] = dfstream['High'].astype(float)
     dfstream['Low'] = dfstream['Low'].astype(float)
 
-    dfstream["ATR"] = ta.atr(
-        dfstream.High, dfstream.Low, dfstream.Close, length=7)
+    dfstream["ATR"] = ta.atr(dfstream.High, dfstream.Low, dfstream.Close, length=7)
     dfstream["EMA_fast"] = ta.ema(dfstream.Close, length=30)
     dfstream["EMA_slow"] = ta.ema(dfstream.Close, length=50)
     dfstream['RSI'] = ta.rsi(dfstream.Close, length=10)
@@ -108,7 +96,7 @@ def get_candles_frame(n):
 
     return dfstream
 
-#starting values
+#starting sl/tp values
 slatrcoef = 1.2
 TPSLRatio_coef = 1.1
 
@@ -160,18 +148,15 @@ def fitting_job():
         file.write(
             f"{slatrcoef}, {TPSLRatio_coef}, expected return, {stats['Return [%]']}\n")
 
-
 def trading_job():
-
     dfstream = get_candles_frame(70)
-    # current candle looking for open price entry
     signal = total_signal(dfstream, len(dfstream)-1, 7)
 
     global slatrcoef
     global TPSLRatio_coef
 
     now = datetime.now()
-    if now.weekday() == 0 and now.hour < 7 and now.minute < 5:  # Monday before 07:05
+    if now.weekday() == 0 and now.hour < 7 and now.minute < 5:
         fitting_job()
         print(slatrcoef, TPSLRatio_coef)
 
@@ -191,33 +176,28 @@ def trading_job():
     TPSell = candle_open_bid-slatr*TPSLRatio-spread
 
     client = API(access_token=access_token)
-    # Sell
+
     if signal == 1 and count_opened_trades() == 0 and spread < max_spread:
         print("Sell Signal Found...")
         mo = MarketOrderRequest(instrument="EUR_USD", units=-lotsize, takeProfitOnFill=TakeProfitDetails(
             price=TPSell).data, stopLossOnFill=StopLossDetails(price=SLSell).data)
         r = orders.OrderCreate(accountID, data=mo.data)
         rv = client.request(r)
-        # print(rv)
         with open("trading_data_file.txt", "a") as file:
             file.write(f"{slatrcoef}, {TPSLRatio_coef}\n")
             file.write(f"{rv}\n")
 
-    # Buy
     elif signal == 2 and count_opened_trades() == 0 and spread < max_spread:
         print("Buy Signal Found...")
         mo = MarketOrderRequest(instrument="EUR_USD", units=lotsize, takeProfitOnFill=TakeProfitDetails(
             price=TPBuy).data, stopLossOnFill=StopLossDetails(price=SLBuy).data)
         r = orders.OrderCreate(accountID, data=mo.data)
         rv = client.request(r)
-        # print(rv)
         with open("trading_data_file.txt", "a") as file:
             file.write(f"{slatrcoef}, {TPSLRatio_coef}\n")
             file.write(f"{rv}\n")
-
     else:
         print(now, "- No Signal!")
-
 
 scheduler = BlockingScheduler()
 scheduler.add_job(trading_job, 'cron', day_of_week='mon-fri', hour='07-18',

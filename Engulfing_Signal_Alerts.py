@@ -5,22 +5,17 @@ from email.message import EmailMessage
 import ssl
 import smtplib
 
+#Receive email alerts based on your own algorithms/indicators that generate signals
+#Current example illustrate the use of a candle engulfing pattern as a signal
+#User should log online and review the chart of the specific stock before making a decision
 
-#Data Function
 def get_data(symbol: str):
-    ''' symbol is the ticker from yf, reset the date index of the data dataframe 
-        to an integer index (drop it if not needed) also drop the ticker header
-    '''
     data = yf.download(tickers=symbol, period='5d', interval='1d')
     data.columns = data.columns.droplevel(-1)
     data.reset_index(inplace=True)
     return data
 
-
-#SIGNAL generation function
 def test_engulfing(df):
-    ''' Generate bearish/bullish signal based on simple engulfing patterns
-    '''
     last_open = df.iloc[-1, :].Open
     last_close = df.iloc[-1, :].Close
     previous_open = df.iloc[-2, :].Open
@@ -37,14 +32,10 @@ def test_engulfing(df):
     else:
         return 0  # No Engulfing Pattern
 
-
-#Gmail config using a tokens_api file
-#(Generate your own token in your Gmail account)
+#Gmail config using a tokens file (Generate token in your Gmail account)
 config = ConfigParser(interpolation=None)
 if os.path.exists('tokens_api.ini'):
-    #API config ini file
     config.read('tokens_api.ini')
-
     gmail_user = config['gmail']['gmail_user']
     gmail_password = config['gmail']['gmail_password']
 
@@ -59,24 +50,18 @@ em['From'] = email_from
 em['To'] =  email_to
 em['Subject'] = subject
 
-
-#Multiple Tickers
 symbols =  ['AAPL', 'NVDA', 'META']
 
 def tickers_job():
-    ''' Send email if signal detected for any ticker in symbols list
-    '''
     msg= "Results: \n"
-
+	
     for symb in symbols:
         historical_data = get_data(symb)
 
         if test_engulfing(historical_data)==1:
             msg = msg + str(symb+": the signal is 1 bearish") + "\n"
-
         elif test_engulfing(historical_data)==2:
             msg = msg + str(symb+": the signal is 2 bullish") + "\n"
-    
         elif test_engulfing(historical_data)==0:
             msg = msg + str(symb+": no signal") + "\n"
 
