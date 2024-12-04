@@ -70,13 +70,7 @@ def get_candles(n):
     collector = client.get_collector(Pair.EUR_USD, Gran.M5)
     candles = collector.grab(n)
     return candles
-
-
-candles = get_candles(3)
-for candle in candles:
-    print(float(str(candle.bid.o)) > 1)
-    print(candle)
-
+	
 
 def count_opened_trades():
     client = API(access_token=access_token)

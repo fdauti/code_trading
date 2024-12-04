@@ -12,8 +12,8 @@ def get_data(symbol: str):
         to an integer index (drop it if not needed) also drop the ticker header
     '''
     data = yf.download(tickers=symbol, period='5d', interval='1d')
-    data.columns = data.columns.droplevel(-1) #will drop the Ticker Header
-    data.reset_index(inplace=True) # drop=True
+    data.columns = data.columns.droplevel(-1)
+    data.reset_index(inplace=True)
     return data
 
 
@@ -39,6 +39,7 @@ def test_engulfing(df):
 
 
 #Gmail config using a tokens_api file
+#(Generate your own token in your Gmail account)
 config = ConfigParser(interpolation=None)
 if os.path.exists('tokens_api.ini'):
     #API config ini file
@@ -52,8 +53,8 @@ em = EmailMessage()
 gmail_user = gmail_user
 gmail_password = gmail_password
 subject = 'info signal'
-email_from = 'fule.fesi@gmail.com'
-email_to = 'hfotjon@gmail.com'
+email_from = 'xxx@gmail.com'
+email_to = 'xxx@email.com'
 em['From'] = email_from
 em['To'] =  email_to
 em['Subject'] = subject
