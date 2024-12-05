@@ -13,15 +13,16 @@ from oandapyV20.contrib.requests import MarketOrderRequest
 from oandapyV20.contrib.requests import TakeProfitDetails, StopLossDetails
 
 import warnings
-warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 #Forex trading bot for OANDA broker
-#Requires Oanda Access token and account ID to initialize client
-#Strategy uses backtesting for weekly optimization of sl/tp values
-#Indicators should be removed/added and parameters tuned to generate more signals based on your strategy
 #Only 28 forex pair combinations for the 8 major currencies are supported
 #Following example with EUR_USD pair in 5min timeframe
-#Script can be run on a VM in cloud with Paper account for analyzing results before deploying Live if profitable
+#Requires Oanda Access token and account ID to initialize client
+#Indicators can be removed/added and parameters tuned to generate more trading signals
+#Strategy uses backtesting for weekly optimization of sl/tp values
+#Script can be run on a VM in cloud with Paper/Demo account 
+#Analyze results before deploying Live if profitable in long term
 
 config = ConfigParser(interpolation=None)
 if os.path.exists('tokens_api.ini'):
@@ -31,7 +32,6 @@ else:
 
 accountID = config['oanda_demo']['accountID']
 access_token = config['oanda_demo']['access_token']
-lotsize = 3000
 
 def ema_signal(df, current_candle, backcandles):
     df_slice = df.reset_index().copy()
@@ -96,7 +96,8 @@ def get_candles_frame(n):
 
     return dfstream
 
-#starting sl/tp values
+#starting values
+lotsize = 3000
 slatrcoef = 1.2
 TPSLRatio_coef = 1.1
 
@@ -134,11 +135,11 @@ def fitting_job():
                 self.sell(sl=sl1, tp=tp1, size=self.mysize)
 
     bt = Backtest(dfstream, MyStrat, cash=250, margin=1/30)
-    stats, heatmap = bt.optimize(slcoef=[i/10 for i in range(10, 26)],
+    stats = bt.optimize(slcoef=[i/10 for i in range(10, 26)],
                                  TPSLRatio=[i/10 for i in range(10, 26)],
                                  maximize='Return [%]', max_tries=300,
                                  random_state=0,
-                                 return_heatmap=True)
+                                 return_heatmap=False)
 
     slatrcoef = stats["_strategy"].slcoef
     TPSLRatio_coef = stats["_strategy"].TPSLRatio
