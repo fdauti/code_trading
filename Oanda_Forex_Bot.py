@@ -13,7 +13,7 @@ from oandapyV20.contrib.requests import MarketOrderRequest
 from oandapyV20.contrib.requests import TakeProfitDetails, StopLossDetails
 
 import warnings
-warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
 
 #Forex trading bot for OANDA broker
 #Only 28 forex pair combinations for the 8 major currencies are supported
