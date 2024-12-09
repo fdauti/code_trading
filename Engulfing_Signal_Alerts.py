@@ -8,6 +8,8 @@ import smtplib
 #Receive email alerts based on your own algorithms/indicators that generate signals
 #Current example illustrate the use of a candle engulfing pattern as a signal
 #User should log online and review the chart of the specific stock before making a decision
+#Code explanation on CodeTrading YT channel: https://www.youtube.com/watch?v=YYJ6iRXSy6Y
+
 
 def get_data(symbol: str):
     data = yf.download(tickers=symbol, period='5d', interval='1d')

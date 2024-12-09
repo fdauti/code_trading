@@ -24,6 +24,9 @@ warnings.filterwarnings("ignore", category=UserWarning)
 #Script can be run on a VM in cloud with Paper/Demo account 
 #Analyze results before deploying Live if profitable in long term
 
+#Code explanation on CodeTrading YT channel: https://www.youtube.com/watch?v=WcfKaZL4vpA
+
+
 config = ConfigParser(interpolation=None)
 if os.path.exists('tokens_api.ini'):
     config.read('tokens_api.ini')
